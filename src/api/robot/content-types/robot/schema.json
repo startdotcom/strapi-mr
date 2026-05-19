@@ -1,0 +1,38 @@
+{
+  "kind": "collectionType",
+  "collectionName": "robots",
+  "info": {
+    "singularName": "robot",
+    "pluralName": "robots",
+    "displayName": "Robot",
+    "description": "Robot products for Mr. Robotick"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "description": {
+      "type": "richtext"
+    },
+    "price": {
+      "type": "decimal",
+      "required": true,
+      "min": 0
+    },
+    "images": {
+      "type": "media",
+      "multiple": true,
+      "required": false,
+      "allowedTypes": ["images"]
+    },
+    "category": {
+      "type": "string",
+      "required": false
+    }
+  }
+}
