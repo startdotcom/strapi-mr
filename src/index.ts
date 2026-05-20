@@ -1,5 +1,7 @@
 ﻿import type { Core } from '@strapi/strapi';
-import { writeFile, unlink } from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { unlink, stat } from 'fs/promises';
+import { pipeline } from 'stream/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
@@ -76,13 +78,14 @@ async function fetchAndUploadImage(
       return null;
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
     const contentType = response.headers.get('content-type') || 'image/jpeg';
     const ext = contentType.includes('png') ? 'png' : 'jpg';
     const fileName = `${robotName.toLowerCase().replace(/\s+/g, '-')}.${ext}`;
     const tmpPath = join(tmpdir(), fileName);
 
-    await writeFile(tmpPath, buffer);
+    // Stream response body directly to disk — avoids holding full image in memory
+    await pipeline(response.body as unknown as NodeJS.ReadableStream, createWriteStream(tmpPath));
+    const { size } = await stat(tmpPath);
 
     const [uploadedFile] = await strapi.plugin('upload').service('upload').upload({
       data: {
@@ -95,8 +98,8 @@ async function fetchAndUploadImage(
       files: {
         name: fileName,
         type: contentType,
-        size: buffer.length,
-        filepath: tmpPath,  // formidable v3 (used by Strapi 5) uses filepath, not path
+        size,
+        filepath: tmpPath,
       },
     });
 
