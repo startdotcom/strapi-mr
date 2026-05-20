@@ -1,9 +1,4 @@
 ﻿import type { Core } from '@strapi/strapi';
-import { createWriteStream } from 'fs';
-import { unlink, stat } from 'fs/promises';
-import { pipeline } from 'stream/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
 
 const ROBOT_SEED = [
   {
@@ -64,54 +59,6 @@ const ROBOT_SEED = [
   },
 ];
 
-async function fetchAndUploadImage(
-  strapi: Core.Strapi,
-  url: string,
-  robotName: string
-): Promise<number | null> {
-  try {
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MrRobotick/1.0)' },
-    });
-    if (!response.ok) {
-      strapi.log.warn(`[seed] Image fetch failed (${response.status}) for ${robotName}`);
-      return null;
-    }
-
-    const contentType = response.headers.get('content-type') || 'image/jpeg';
-    const ext = contentType.includes('png') ? 'png' : 'jpg';
-    const fileName = `${robotName.toLowerCase().replace(/\s+/g, '-')}.${ext}`;
-    const tmpPath = join(tmpdir(), fileName);
-
-    // Stream response body directly to disk — avoids holding full image in memory
-    await pipeline(response.body as unknown as NodeJS.ReadableStream, createWriteStream(tmpPath));
-    const { size } = await stat(tmpPath);
-
-    const [uploadedFile] = await strapi.plugin('upload').service('upload').upload({
-      data: {
-        fileInfo: {
-          name: fileName,
-          alternativeText: robotName,
-          caption: robotName,
-        },
-      },
-      files: {
-        name: fileName,
-        type: contentType,
-        size,
-        filepath: tmpPath,
-      },
-    });
-
-    await unlink(tmpPath).catch(() => {});
-    strapi.log.info(`[seed] Uploaded image for ${robotName} (id: ${uploadedFile.id})`);
-    return uploadedFile.id;
-  } catch (err) {
-    strapi.log.warn(`[seed] Could not upload image for ${robotName}: ${err}`);
-    return null;
-  }
-}
-
 export default {
   register(/* { strapi }: { strapi: Core.Strapi } */) {},
 
@@ -124,18 +71,12 @@ export default {
 
     for (const robot of ROBOT_SEED) {
       try {
-        // Upload image from URL if available
-        const imageId = robot.imageUrl
-          ? await fetchAndUploadImage(strapi, robot.imageUrl, robot.name)
-          : null;
-
         const doc = await strapi.documents('api::robot.robot').create({
           data: {
             name: robot.name,
             description: robot.description,
             price: robot.price,
             category: robot.category,
-            ...(imageId ? { images: [imageId] } : {}),
           },
         });
 
